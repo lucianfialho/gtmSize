@@ -12,21 +12,24 @@
                 
                 if(sizeByGoogleTagManagerLimit(parseInt(contentLengthObj.value)) < 50) {
                     chrome.action.setBadgeBackgroundColor({
-                        color: "green"
+                        color: "green",
+                        tabId: details.tabId
                     })
                     return
                 }
                 
                 if(sizeByGoogleTagManagerLimit(parseInt(contentLengthObj.value)) < 69) {
                     chrome.action.setBadgeBackgroundColor({
-                        color: "yellow"
+                        color: "yellow",
+                        tabId: details.tabId
                     })
                     return
                 }
                 
                 if(sizeByGoogleTagManagerLimit(parseInt(contentLengthObj.value)) >= 70) {
                     chrome.action.setBadgeBackgroundColor({
-                        color: "red"
+                        color: "red",
+                        tabId: details.tabId
                     })
                     return
                 }
