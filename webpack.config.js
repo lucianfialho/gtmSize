@@ -4,7 +4,9 @@ const HtmlPlugin = require("html-webpack-plugin");
 
 module.exports = {
     mode: "development",
-    entry: "./src/popup/popup.js",
+    entry: {
+        popup: "./src/popup/popup.js"
+    },
     module: {
         rules: [{
             test: /\.js$/,
