@@ -6,14 +6,21 @@ module.exports = {
     mode: "development",
     devtool: "cheap-module-source-map",
     entry: {
-        popup: "./src/popup/popup.js"
+        popup: path.resolve("./src/popup/popup.js")
     },
     module: {
-        rules: [{
-            test: /\.js$/,
-            use: "raw-loader",
-            exclude: /node_modules/
-        }],
+        rules: [
+            {
+                test: /\.m?js$/,
+                exclude: /(node_modules|bower_components)/,
+                use: {
+                    loader: 'babel-loader',
+                    options: {
+                        presets: ['@babel/preset-env', '@babel/preset-react']
+                    }
+                }
+            }
+        ]
     },
     plugins: [
         new CopyPlugin({
@@ -47,9 +54,19 @@ module.exports = {
         new HtmlPlugin({
             title: "Gtm size",
             filename: "popup.html",
-            chunks: ["popup"]
+            chunks: ["popup"],
+            templateContent: `
+                <html>
+                    <body>
+                        <div id='root'></div>
+                    </body>
+                </html>
+            `
         })
     ],
+    resolve: {
+        extensions: ['.js']
+    },
     output: {
         filename: "[name].js"
     }
