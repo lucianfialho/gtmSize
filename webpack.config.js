@@ -1,8 +1,10 @@
 const CopyPlugin = require("copy-webpack-plugin");
-const path = require("path")
+const path = require("path");
+const HtmlPlugin = require("html-webpack-plugin");
+
 module.exports = {
     mode: "development",
-    entry: "./src/test.js",
+    entry: "./src/popup/popup.js",
     module: {
         rules: [{
             test: /\.js$/,
@@ -33,7 +35,15 @@ module.exports = {
                     from: path.resolve("src/assets/icon-128x128.png"),
                     to: path.resolve("dist")
                 },
+                { 
+                    from: path.resolve("src/background.js"),
+                    to: path.resolve("dist")
+                },
             ]
+        }),
+        new HtmlPlugin({
+            title: "Gtm size",
+            filename: "popup.html"
         })
     ],
     output: {

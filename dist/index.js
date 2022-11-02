@@ -10,13 +10,13 @@
 /******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ({
 
-/***/ "./src/test.js":
-/*!*********************!*\
-  !*** ./src/test.js ***!
-  \*********************/
+/***/ "./src/popup/popup.js":
+/*!****************************!*\
+  !*** ./src/popup/popup.js ***!
+  \****************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpack_require__.d(__webpack_exports__, {\n/* harmony export */   \"default\": () => (__WEBPACK_DEFAULT_EXPORT__)\n/* harmony export */ });\n/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (\"import React from \\\"react\\\";\\n\\n\\nconst test = <h1> Hello World</h1>\");\n\n//# sourceURL=webpack://gtmsize/./src/test.js?");
+eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpack_require__.d(__webpack_exports__, {\n/* harmony export */   \"default\": () => (__WEBPACK_DEFAULT_EXPORT__)\n/* harmony export */ });\n/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = (\"import React from \\\"react\\\";\\n\\n\\nconst test = <h1> Hello World</h1>\");\n\n//# sourceURL=webpack://gtmsize/./src/popup/popup.js?");
 
 /***/ })
 
@@ -60,7 +60,7 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpac
 /******/ 	// Load entry module and return exports
 /******/ 	// This entry module can't be inlined because the eval devtool is used.
 /******/ 	var __webpack_exports__ = {};
-/******/ 	__webpack_modules__["./src/test.js"](0, __webpack_exports__, __webpack_require__);
+/******/ 	__webpack_modules__["./src/popup/popup.js"](0, __webpack_exports__, __webpack_require__);
 /******/ 	
 /******/ })()
 ;
