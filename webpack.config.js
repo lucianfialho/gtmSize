@@ -4,6 +4,7 @@ const HtmlPlugin = require("html-webpack-plugin");
 
 module.exports = {
     mode: "development",
+    devtool: "cheap-module-source-map",
     entry: {
         popup: "./src/popup/popup.js"
     },
@@ -45,10 +46,11 @@ module.exports = {
         }),
         new HtmlPlugin({
             title: "Gtm size",
-            filename: "popup.html"
+            filename: "popup.html",
+            chunks: ["popup"]
         })
     ],
     output: {
-        filename: "index.js"
+        filename: "[name].js"
     }
 }
