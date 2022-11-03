@@ -1,6 +1,9 @@
 const CopyPlugin = require("copy-webpack-plugin");
 const path = require("path");
 const HtmlPlugin = require("html-webpack-plugin");
+const tailwindcss = require("tailwindcss");
+const autoprefixer = require("autoprefixer");
+
 
 module.exports = {
     mode: "development",
@@ -19,6 +22,18 @@ module.exports = {
                         presets: ['@babel/preset-env', '@babel/preset-react']
                     }
                 }
+            },
+            {
+              use: ["style-loader", "css-loader", {
+                loader: "postcss-loader",
+                options: {
+                    postcssOptions: {
+                        ident: "postcss",
+                        plugins: [tailwindcss, autoprefixer]
+                    }
+                }
+              }],
+              test: /\.css$/i
             }
         ]
     },
@@ -30,19 +45,19 @@ module.exports = {
                     to: path.resolve("dist")
                 },
                 { 
-                    from: path.resolve("src/assets/icon-16x16.png"),
+                    from: path.resolve("src/static/icon-16x16.png"),
                     to: path.resolve("dist")
                 },
                 { 
-                    from: path.resolve("src/assets/icon-38x38.png"),
+                    from: path.resolve("src/static/icon-38x38.png"),
                     to: path.resolve("dist")
                 },
                 { 
-                    from: path.resolve("src/assets/icon-48x48.png"),
+                    from: path.resolve("src/static/icon-48x48.png"),
                     to: path.resolve("dist")
                 },
                 { 
-                    from: path.resolve("src/assets/icon-128x128.png"),
+                    from: path.resolve("src/static/icon-128x128.png"),
                     to: path.resolve("dist")
                 },
                 { 
