@@ -49,6 +49,17 @@
         return (sizeOfContainer / googleTagManagerSizeLimit) * 100
     }
 
+    if(contentLengthInKb === null) {
+        return chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+                sendResponse(
+                    { 
+                        result: false,
+                    }
+                );
+            return true; 
+        });
+    }
+
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         sendResponse(
             { 
