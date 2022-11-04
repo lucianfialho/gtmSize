@@ -50,7 +50,12 @@
     }
 
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-        sendResponse({ result: `${contentLengthInKb.toString()}KB` });
+        sendResponse(
+            { 
+                result: `${contentLengthInKb.toString()}KB`,
+                percent: Math.round(sizeByGoogleTagManagerLimit(parseInt(contentLengthObj.value)))
+            }
+        );
         return true; 
     });
 }());
