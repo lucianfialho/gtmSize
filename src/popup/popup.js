@@ -6,8 +6,9 @@ import "../assets/tailwind.css";
 function App () {
     const [containerSize, setContainerSize] = useState({ result: null, percent: null});
     useEffect(() => {
+        
         chrome.runtime.sendMessage("teste", function(response) {
-            
+                
             setContainerSize(
                 { 
                     result: response.result, 
