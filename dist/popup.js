@@ -34104,10 +34104,7 @@ function App() {
     "fill-rule": "evenodd",
     d: "M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z",
     "clip-rule": "evenodd"
-  })), "Follow me on instagram ", " \xA0 ", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("a", {
-    className: "font-medium",
-    href: "https://instagram.com.br/lucianfialho"
-  }, "@lucianfialho")))))));
+  })), "Follow us on instagram ", " \xA0 @metricasboss"))))));
 }
 var root = document.getElementById("root");
 (0,react_dom_client__WEBPACK_IMPORTED_MODULE_1__.createRoot)(root).render( /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(App, null));
