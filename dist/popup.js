@@ -34009,14 +34009,14 @@ function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
 
 function App() {
   var _useState = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
-      result: null,
-      percent: null
+      result: 0,
+      percent: 0
     }),
     _useState2 = _slicedToArray(_useState, 2),
     containerSize = _useState2[0],
     setContainerSize = _useState2[1];
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
-    chrome.runtime.sendMessage("teste", function (response) {
+    chrome.runtime.sendMessage("open", function (response) {
       setContainerSize({
         result: response.result,
         percent: response.percent || null
@@ -34037,7 +34037,7 @@ function App() {
     className: "font-medium"
   }, containerSize.result)) : /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "mt-1 text-slate-500 pb-5"
-  }, "There is no container in this page ", ":/")), containerSize.result && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement((react__WEBPACK_IMPORTED_MODULE_0___default().Fragment), null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+  }, "There is no container in this page refresh the page", ":/")), containerSize.result && /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement((react__WEBPACK_IMPORTED_MODULE_0___default().Fragment), null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
     className: "ml-4 flex-auto py-5"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("h2", {
     className: "font-medium"
@@ -34057,9 +34057,9 @@ function App() {
     viewBox: "0 0 20 20",
     xmlns: "http://www.w3.org/2000/svg"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("path", {
-    "fill-rule": "evenodd",
+    fillRule: "evenodd",
     d: "M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z",
-    "clip-rule": "evenodd"
+    clipRule: "evenodd"
   })), "Delete all paused tags you have inside your container"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", {
     className: "flex items-center"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("svg", {
@@ -34068,9 +34068,9 @@ function App() {
     viewBox: "0 0 20 20",
     xmlns: "http://www.w3.org/2000/svg"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("path", {
-    "fill-rule": "evenodd",
+    fillRule: "evenodd",
     d: "M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z",
-    "clip-rule": "evenodd"
+    clipRule: "evenodd"
   })), "Delete all triggerless tags you have inside your container"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", {
     className: "flex items-center"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("svg", {
@@ -34079,9 +34079,9 @@ function App() {
     viewBox: "0 0 20 20",
     xmlns: "http://www.w3.org/2000/svg"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("path", {
-    "fill-rule": "evenodd",
+    fillRule: "evenodd",
     d: "M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z",
-    "clip-rule": "evenodd"
+    clipRule: "evenodd"
   })), "Delete all untagged triggers you have inside your container"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", {
     className: "flex items-center"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("svg", {
@@ -34090,9 +34090,9 @@ function App() {
     viewBox: "0 0 20 20",
     xmlns: "http://www.w3.org/2000/svg"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("path", {
-    "fill-rule": "evenodd",
+    fillRule: "evenodd",
     d: "M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z",
-    "clip-rule": "evenodd"
+    clipRule: "evenodd"
   })), "Delete all unused or duplicated variables within your container"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("li", {
     className: "flex items-center"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("svg", {
@@ -34101,10 +34101,10 @@ function App() {
     viewBox: "0 0 20 20",
     xmlns: "http://www.w3.org/2000/svg"
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("path", {
-    "fill-rule": "evenodd",
+    fillRule: "evenodd",
     d: "M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z",
-    "clip-rule": "evenodd"
-  })), "Follow us on instagram ", " \xA0 @metricasboss"))))));
+    clipRule: "evenodd"
+  })), "Follow us on instagram ", "\xA0@metricasboss"))))));
 }
 var root = document.getElementById("root");
 (0,react_dom_client__WEBPACK_IMPORTED_MODULE_1__.createRoot)(root).render( /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(App, null));

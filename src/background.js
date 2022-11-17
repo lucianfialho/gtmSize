@@ -50,6 +50,7 @@
     }
 
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+
         if(contentLengthInKb === null) {
             sendResponse(
                 { 
