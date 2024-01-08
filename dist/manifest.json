@@ -1,6 +1,6 @@
 {
     "name": "Get Google Tag Manager Size",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "manifest_version": 3,
     "permissions": [
         "webRequest"
@@ -9,6 +9,13 @@
     "background": {
         "service_worker": "background.js"
     },
+    "content_scripts": [
+        {
+            "matches": ["*://*/*"],
+            "js": ["performance.js"]
+        }
+
+    ],
     "action": {
         "default_title": "Get Google Tag Manager Size",
         "default_icon": {

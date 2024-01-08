@@ -8,6 +8,7 @@ function App() {
   const [containers, setContainers] = useState({});
   const [error, setError] = useState(false);
   const [message, setMessage] = useState(false);
+  const [pageLoading, setPageLoading] = useState(0);
 
   useEffect(() => {
     const sendMessageToBackground = () => {
@@ -17,6 +18,7 @@ function App() {
             console.error("Erro ao enviar mensagem:", chrome.runtime.lastError);
           } else {
             setContainers(response.containers);
+            setPageLoading(parseFloat(response.pageLoadTiming));
 
             if (Object.keys(response.containers).length > 1) {
               setError(true);
@@ -126,12 +128,13 @@ function App() {
                 <div className="flex">
                   Loading Time:&nbsp;
                   <span className="font-medium flex items-center">
-                    {data.timing.loadTime / 100} seconds
+                    {data.timing.loadTime} seconds
                   </span>
                 </div>
                 <p className="mt-2 font-medium text-slate-500">
-                  The Google Tag Manager container is {`${data.percent}%`} away
-                  from exceeding its limit.
+                  The Google Tag Manager container impact{" "}
+                  {Math.round((data.timing.loadTime / pageLoading) * 100)}% from
+                  from page load time {`(${pageLoading})s`}.
                 </p>
               </div>
               <Accordion title={`Detail View`}>

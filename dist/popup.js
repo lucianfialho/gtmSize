@@ -34082,6 +34082,10 @@ function App() {
     _useState6 = _slicedToArray(_useState5, 2),
     message = _useState6[0],
     setMessage = _useState6[1];
+  var _useState7 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(0),
+    _useState8 = _slicedToArray(_useState7, 2),
+    pageLoading = _useState8[0],
+    setPageLoading = _useState8[1];
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
     var sendMessageToBackground = function sendMessageToBackground() {
       chrome.tabs.query({
@@ -34095,6 +34099,7 @@ function App() {
             console.error("Erro ao enviar mensagem:", chrome.runtime.lastError);
           } else {
             setContainers(response.containers);
+            setPageLoading(parseFloat(response.pageLoadTiming));
             if (Object.keys(response.containers).length > 1) {
               setError(true);
               setMessage("More than one GTM container detected on the page. This can cause conflicts and unexpected errors.");
@@ -34185,9 +34190,9 @@ function App() {
       className: "flex"
     }, "Loading Time:\xA0", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
       className: "font-medium flex items-center"
-    }, data.timing.loadTime / 100, " seconds")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", {
+    }, data.timing.loadTime, " seconds")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", {
       className: "mt-2 font-medium text-slate-500"
-    }, "The Google Tag Manager container is ", "".concat(data.percent, "%"), " away from exceeding its limit.")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_components_accordion__WEBPACK_IMPORTED_MODULE_3__["default"], {
+    }, "The Google Tag Manager container impact", " ", Math.round(data.timing.loadTime / pageLoading * 100), "% from from page load time ", "(".concat(pageLoading, ")s"), ".")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_components_accordion__WEBPACK_IMPORTED_MODULE_3__["default"], {
       title: "Detail View"
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
       className: "font-medium"

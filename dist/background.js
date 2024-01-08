@@ -1,7 +1,7 @@
 (function () {
   let containersByTab = {};
   let requestTiming = {};
-
+  let pageLoadTiming = null;
   chrome.webRequest.onBeforeRequest.addListener(
     (details) => {
       if (
@@ -28,7 +28,8 @@
 
         if (timing) {
           timing.endTime = performance.now();
-          timing.loadTime = Math.round(timing.endTime - timing.startTime);
+          timing.loadTime =
+            Math.round(timing.endTime - timing.startTime) / 1000; //in seconds
         }
 
         if (contentLengthObj) {
@@ -167,8 +168,15 @@
   }
 
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.time) {
+      pageLoadTiming = request.time;
+    }
+
     if (request.tabId && containersByTab[request.tabId]) {
-      sendResponse({ containers: containersByTab[request.tabId] });
+      sendResponse({
+        containers: containersByTab[request.tabId],
+        pageLoadTiming,
+      });
     } else {
       sendResponse({ containers: {} });
     }
