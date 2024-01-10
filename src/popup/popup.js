@@ -131,11 +131,12 @@ function App() {
                     {data.timing.loadTime} seconds
                   </span>
                 </div>
-                <p className="mt-2 font-medium text-slate-500">
-                  The Google Tag Manager container impact{" "}
-                  {Math.round((data.timing.loadTime / pageLoading) * 100)}% from
-                  from page load time {`(${pageLoading})s`}.
-                </p>
+                <div className="flex">
+                  Page Loading Time:&nbsp;
+                  <span className="font-medium flex items-center">
+                    {pageLoading} seconds
+                  </span>
+                </div>
               </div>
               <Accordion title={`Detail View`}>
                 <p>

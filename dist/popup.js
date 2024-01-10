@@ -34190,9 +34190,11 @@ function App() {
       className: "flex"
     }, "Loading Time:\xA0", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
       className: "font-medium flex items-center"
-    }, data.timing.loadTime, " seconds")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", {
-      className: "mt-2 font-medium text-slate-500"
-    }, "The Google Tag Manager container impact", " ", Math.round(data.timing.loadTime / pageLoading * 100), "% from from page load time ", "(".concat(pageLoading, ")s"), ".")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_components_accordion__WEBPACK_IMPORTED_MODULE_3__["default"], {
+    }, data.timing.loadTime, " seconds")), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("div", {
+      className: "flex"
+    }, "Page Loading Time:\xA0", /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
+      className: "font-medium flex items-center"
+    }, pageLoading, " seconds"))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement(_components_accordion__WEBPACK_IMPORTED_MODULE_3__["default"], {
       title: "Detail View"
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("p", null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default().createElement("span", {
       className: "font-medium"
