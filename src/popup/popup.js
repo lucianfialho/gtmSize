@@ -181,7 +181,7 @@ function App() {
           {imageExists && (
             <div className="flex justify-center mt-4">
               <a
-                href="https://metricasboss.com.br/link-extension"
+                href="https://metricasboss.com.br/api/extension/link"
                 target="_blank"
                 rel="noopener noreferrer"
               >
