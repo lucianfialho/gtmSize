@@ -9,6 +9,7 @@ function App() {
   const [error, setError] = useState(false);
   const [message, setMessage] = useState(false);
   const [pageLoading, setPageLoading] = useState(0);
+  const [imageExists, setImageExists] = useState(false);
 
   useEffect(() => {
     const sendMessageToBackground = () => {
@@ -43,6 +44,13 @@ function App() {
     } else {
       setTimeout(sendMessageToBackground, 1000);
     }
+
+    // Verificar se a imagem existe
+    const img = new Image();
+    img.src =
+      "https://s3.sa-east-1.amazonaws.com/download.metricasboss.com.br/banner_extension.png";
+    img.onload = () => setImageExists(true);
+    img.onerror = () => setImageExists(false);
   }, []);
 
   return (
@@ -170,6 +178,20 @@ function App() {
               </Accordion>
             </div>
           ))}
+          {imageExists && (
+            <div className="flex justify-center mt-4">
+              <a
+                href="https://metricasboss.com.br/link-extension"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <img
+                  src="https://s3.sa-east-1.amazonaws.com/download.metricasboss.com.br/banner_extension.png"
+                  alt="Banner da extensão"
+                />
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </div>
