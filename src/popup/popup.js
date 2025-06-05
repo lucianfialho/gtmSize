@@ -4,6 +4,15 @@ import { createRoot } from "react-dom/client";
 import "../assets/tailwind.css";
 import Accordion from "../components/accordion";
 
+const extractDomain = (url) => {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname;
+  } catch {
+    return url;
+  }
+};
+
 function App() {
   const [containers, setContainers] = useState({});
   const [error, setError] = useState(false);
@@ -12,45 +21,95 @@ function App() {
   const [imageExists, setImageExists] = useState(false);
 
   useEffect(() => {
-    const sendMessageToBackground = () => {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        chrome.runtime.sendMessage({ tabId: tabs[0].id }, function (response) {
-          if (chrome.runtime.lastError) {
-            console.error("Erro ao enviar mensagem:", chrome.runtime.lastError);
-          } else {
-            setContainers(response.containers);
-            setPageLoading(parseFloat(response.pageLoadTiming));
+    const sendMessageToBackground = async () => {
+      console.log('Querying active tab...');
+      
+      try {
+        // Verificar se a API de extensão está disponível
+        if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.tabs) {
+          console.error('Chrome extension API not available');
+          setError(true);
+          setMessage('Extensão não está disponível neste contexto');
+          return;
+        }
 
-            if (Object.keys(response.containers).length > 1) {
-              setError(true);
-              setMessage(
-                "More than one GTM container detected on the page. This can cause conflicts and unexpected errors."
-              );
-            }
-
-            if (Object.keys(response.containers).length < 1) {
-              setError(true);
-              setMessage(
-                "There is no container installed or container not detected please refresh the page."
-              );
-            }
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        
+        if (!tabs || tabs.length === 0) {
+          console.error('No active tab found');
+          setError(true);
+          setMessage('Nenhuma aba ativa encontrada');
+          return;
+        }
+        
+        console.log('Active tab found:', tabs[0]);
+        console.log('Sending message to background script...');
+        
+        try {
+          const response = await chrome.runtime.sendMessage({ 
+            action: 'getContainers',
+            tabId: tabs[0].id 
+          });
+          
+          console.log('Response from background:', response);
+          
+          if (!response) {
+            console.error('No response received from background script');
+            setError(true);
+            setMessage('Nenhum dado recebido');
+            return;
           }
-        });
-      });
-    };
+          
+          console.log('Containers data received:', response.containers);
+          
+          setContainers(response.containers || {});
+          setPageLoading(parseFloat(response.pageLoadTiming) || 0);
 
-    if (chrome.runtime && chrome.runtime.id) {
-      sendMessageToBackground();
-    } else {
-      setTimeout(sendMessageToBackground, 1000);
-    }
+          const containerCount = Object.keys(response.containers || {}).length;
+          console.log('Number of containers found:', containerCount);
+
+          if (containerCount > 1) {
+            setError(true);
+            setMessage(
+              `Encontrados ${containerCount} containers GTM. Múltiplos containers podem causar conflitos.`
+            );
+          } else if (containerCount === 0) {
+            setError(true);
+            setMessage('Nenhum container GTM encontrado. Atualize a página e tente novamente.');
+          } else {
+            setError(false);
+            setMessage('');
+          }
+          
+        } catch (error) {
+          console.error('Error sending message to background:', error);
+          setError(true);
+          setMessage('Erro ao buscar dados do GTM');
+        }
+      } catch (error) {
+        console.error('Error querying tabs:', error);
+        setError(true);
+        setMessage('Erro ao acessar as abas');
+      }
+    };
 
     // Verificar se a imagem existe
     const img = new Image();
-    img.src =
-      "https://s3.sa-east-1.amazonaws.com/download.metricasboss.com.br/banner_extension.png";
+    img.src = "https://s3.sa-east-1.amazonaws.com/download.metricasboss.com.br/banner_extension.png";
     img.onload = () => setImageExists(true);
     img.onerror = () => setImageExists(false);
+
+    // Executar a busca pelos containers
+    if (chrome.runtime?.id) {
+      sendMessageToBackground();
+    } else {
+      // Se a API ainda não estiver pronta, tenta novamente em 1 segundo
+      const timer = setTimeout(() => {
+        sendMessageToBackground();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   return (
@@ -85,12 +144,34 @@ function App() {
               key={index}
               className="flex-auto my-4 border solid rounded-md p-4"
             >
-              <div className="font-medium">Container ID: {containerId}</div>
+              <div className="font-medium flex items-center gap-2">
+                Container ID: {containerId}
+                {data.isProxy && (
+                  <span className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-800 bg-blue-100 rounded-full">
+                    Server-side GTM
+                  </span>
+                )}
+              </div>
+              {data.isProxy && (
+                <div className="mt-1 text-xs text-slate-600">
+                  <span className="font-medium">Source:</span> {extractDomain(data.url)}
+                </div>
+              )}
               <div className="mt-1 text-slate-500">
-                <div className="flex">
+                <div className="flex items-center">
                   Size:&nbsp;
                   <span className="font-medium flex items-center">
-                    {data.sizeInKb}KB&nbsp;
+                    {data.sizeInKb}KB
+                    {data.sizeEstimate && (
+                      <span className="group relative ml-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-gray-400">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066a1.75 1.75 0 001.271 1.34 1.75 1.75 0 10.257-3.478.25.25 0 01.24-.304h.5a.75.75 0 000-1.5h-.5a.25.25 0 01-.24-.304l.459-2.066a1.75 1.75 0 10-3.478-.257.25.25 0 01-.304.244H9z" clipRule="evenodd" />
+                        </svg>
+                        <span className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-xs rounded py-1 px-2 absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-64">
+                          Tamanho estimado - o servidor não forneceu o cabeçalho Content-Length. Este valor é uma aproximação baseada no tamanho do arquivo baixado.
+                        </span>
+                      </span>
+                    )}&nbsp;
                     {data.percent <= 49 ? (
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -136,7 +217,7 @@ function App() {
                 <div className="flex">
                   Loading Time:&nbsp;
                   <span className="font-medium flex items-center">
-                    {data.timing.loadTime} seconds
+                    {data.timing?.loadTime || "N/A"} seconds
                   </span>
                 </div>
                 <div className="flex">
@@ -149,32 +230,50 @@ function App() {
               <Accordion title={`Detail View`}>
                 <p>
                   <span className="font-medium">Variables:</span>{" "}
-                  {data.analyse.macros}
+                  {data.analyse?.macros || "N/A"}
                 </p>
                 <p>
                   <span className="font-medium mt-2">Triggers:</span>{" "}
-                  {data.analyse.rules}
+                  {data.analyse?.rules || "N/A"}
                 </p>
                 <p>
                   <span className="font-medium mt-2">Tags:</span>{" "}
-                  {data.analyse.tags._html +
+                  {data.analyse?.tags ? 
+                    (data.analyse.tags._html +
                     data.analyse.tags.__gaawe +
-                    data.analyse.tags.__googtag}
-                  <ul className="list-disc list-inside font-normal ml-2">
-                    <li>
-                      <span className="font-normal">Custom HTML:</span>{" "}
-                      {data.analyse.tags._html}
-                    </li>
-                    <li>
-                      <span className="font-normal">GA4 Event:</span>{" "}
-                      {data.analyse.tags.__gaawe}
-                    </li>
-                    <li>
-                      <span className="font-normal">GTAG:</span>{" "}
-                      {data.analyse.tags.__googtag}
-                    </li>
-                  </ul>
+                    data.analyse.tags.__googtag) : "N/A"
+                  }
+                  {data.analyse?.tags && (
+                    <ul className="list-disc list-inside font-normal ml-2">
+                      <li>
+                        <span className="font-normal">Custom HTML:</span>{" "}
+                        {data.analyse.tags._html}
+                      </li>
+                      <li>
+                        <span className="font-normal">GA4 Event:</span>{" "}
+                        {data.analyse.tags.__gaawe}
+                      </li>
+                      <li>
+                        <span className="font-normal">GTAG:</span>{" "}
+                        {data.analyse.tags.__googtag}
+                      </li>
+                    </ul>
+                  )}
                 </p>
+                {data.analyse?.version && (
+                  <p>
+                    <span className="font-medium mt-2">GTM Version:</span>{" "}
+                    {data.analyse.version}
+                  </p>
+                )}
+                {data.url && (
+                  <p className="mt-2">
+                    <span className="font-medium">Source URL:</span>{" "}
+                    <span className="text-xs text-slate-600 break-all">
+                      {data.url}
+                    </span>
+                  </p>
+                )}
               </Accordion>
             </div>
           ))}
