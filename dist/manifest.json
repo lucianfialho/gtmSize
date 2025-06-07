@@ -1,13 +1,15 @@
 {
     "name": "Get Google Tag Manager Size",
-    "version": "2.2.0",
+    "version": "3.0.0",
     "manifest_version": 3,
     "permissions": [
         "webRequest",
         "webNavigation",
         "sidePanel",
         "activeTab",
-        "scripting"
+        "scripting",
+        "tabs",
+        "storage"
     ],
     "host_permissions": [ "*://*/*" ],
     "background": {

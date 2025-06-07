@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 // Mapeamento de tags conhecidas (mesmo do background.js)
 const KNOWN_TAGS = {
@@ -98,49 +98,9 @@ function SidepanelApp() {
   const [activeTab, setActiveTab] = useState(null);
   const [pageLoadTime, setPageLoadTime] = useState(null);
   const [imageExists, setImageExists] = useState(false);
+  const [isFetching, setIsFetching] = useState(false); // Controla se já está buscando
+  const [lastFetchTime, setLastFetchTime] = useState(0); // Rastreia quando foi a última busca
 
-  const extractContainerIdFromUrl = (url) => {
-    console.log(url)
-    if (!url) return 'Unknown Container';
-    
-    try {
-      // Tenta extrair o ID do container da URL usando URLSearchParams
-      const urlObj = new URL(url);
-      const id = urlObj.searchParams.get('id');
-      if (id) return id;
-      
-      // Se não encontrar o parâmetro 'id', tenta extrair de diferentes formatos de URL
-      const patterns = [
-        /[?&]id=([^&]+)/i,  // ?id=XXX ou &id=XXX
-        /\/gtm\.js\?id=([^&]+)/i,  // /gtm.js?id=XXX
-        /\/gtm\.js#id=([^&]+)/i,   // /gtm.js#id=XXX
-        /\/gtm\.js\?.*[&?]id=([^&]+)/i,  // /gtm.js?param=value&id=XXX
-        /\/gtm\.js#.*[&?]id=([^&]+)/i,   // /gtm.js#param=value&id=XXX
-        /\/gtm\.js\/([^?&#]+)/i  // /gtm.js/XXX
-      ];
-      
-      for (const pattern of patterns) {
-        const match = url.match(pattern);
-        if (match && match[1]) {
-          return match[1];
-        }
-      }
-      
-      // Se não encontrou em nenhum formato, retorna o último segmento do caminho
-      const pathParts = url.split(/[?#]/)[0].split('/');
-      const lastPart = pathParts[pathParts.length - 1];
-      if (lastPart && lastPart !== 'gtm.js') {
-        return lastPart;
-      }
-      
-      return 'Unknown Container';
-    } catch (e) {
-      console.error('Error extracting container ID:', e, 'URL:', url);
-      // Tenta extrair o ID de forma mais simples em caso de erro
-      const simpleMatch = url.match(/[?&]id=([^&]+)/i);
-      return simpleMatch ? simpleMatch[1] : 'Unknown Container';
-    }
-  };
 
   // Efeito para verificar se a imagem do banner existe
   useEffect(() => {
@@ -156,115 +116,222 @@ function SidepanelApp() {
     };
   }, []);
 
-  useEffect(() => {
-    // Função para buscar os containers do background
-    const getContainers = async (tabId) => {
-      try {
-        setLoading(true);
-        const tab = tabId ? { id: tabId } : await chrome.tabs.query({ active: true, currentWindow: true }).then(tabs => tabs[0]);
-        
-        if (!tab) {
-          console.error('Nenhuma aba ativa encontrada');
-          setError('Nenhuma aba ativa encontrada');
-          return;
-        }
-        
-        setActiveTab(tab);
-
-        console.log('Solicitando containers para a tab:', tab.id);
-        
-        // Tenta enviar a mensagem com timeout
-        const response = await Promise.race([
-          chrome.runtime.sendMessage({ 
-            action: 'getContainers',
-            tabId: tab.id 
-          }),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout ao buscar containers')), 2000)
-          )
-        ]);
-
-        console.log('Resposta do background:', response);
-        
-        if (response && response.containers) {
-          console.log('Containers recebidos do background:', response.containers);
-          setContainers(response.containers);
-          setPageLoadTime(response.pageLoadTiming || 'N/A');
-        } else {
-          console.log('Nenhum container recebido do background');
-          setContainers({}); // Limpa containers antigos
-        }
-      } catch (err) {
-        console.error('Error getting containers:', err);
-        // Não define erro para não sobrepor a UI com mensagens de erro temporárias
-      } finally {
-        setLoading(false);
+  // Função para carregar containers do cache local
+  const loadFromCache = useCallback(async (tabId) => {
+    try {
+      // Verifica se o chrome.storage está disponível
+      if (!chrome.storage || !chrome.storage.local) {
+        console.log('chrome.storage.local não está disponível');
+        return null;
       }
-    };
+      
+      const result = await chrome.storage.local.get(`containers_${tabId}`);
+      const cachedData = result[`containers_${tabId}`];
+      
+      if (cachedData && (Date.now() - cachedData.timestamp < 5 * 60 * 1000)) {
+        console.log('Containers carregados do cache:', cachedData.containers);
+        return cachedData.containers;
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao carregar do cache:', error);
+      return null;
+    }
+  }, []);
+  
+  // Função para salvar containers no cache local
+  const saveToCache = useCallback(async (tabId, containers) => {
+    try {
+      // Verifica se o chrome.storage está disponível
+      if (!chrome.storage || !chrome.storage.local) {
+        console.log('chrome.storage.local não está disponível para salvar');
+        return false;
+      }
+      
+      if (!tabId || !containers) {
+        console.error('Dados inválidos para salvar no cache');
+        return false;
+      }
+      
+      const cacheKey = `containers_${tabId}`;
+      const cacheData = {
+        containers,
+        timestamp: Date.now(),
+        url: window.location.href
+      };
+      
+      await chrome.storage.local.set({ [cacheKey]: cacheData });
+      console.log('Dados salvos no cache com sucesso');
+      return true;
+    } catch (error) {
+      console.error('Erro ao salvar no cache:', error);
+      return false;
+    }
+  }, []);
 
+  // Função para buscar os containers do background
+  const getContainers = useCallback(async (tabId, forceUpdate = false) => {
+    // Se já estiver buscando e não for uma atualização forçada, ignora
+    if (isFetching && !forceUpdate) {
+      console.log('[getContainers] Busca já em andamento, ignorando...');
+      return;
+    }
+
+    // Se não for uma atualização forçada e já tivermos dados, não faz nada
+    if (!forceUpdate && Object.keys(containers).length > 0) {
+      console.log('[getContainers] Já temos dados, ignorando busca...');
+      return;
+    }
+
+    console.log(`[getContainers] Iniciando busca por containers (forçado: ${forceUpdate})...`);
+    
+    try {
+      setIsFetching(true);
+      setLoading(true);
+      setError(null);
+      
+      const tab = tabId ? { id: tabId } : await chrome.tabs.query({ active: true, currentWindow: true }).then(tabs => tabs[0]);
+      
+      if (!tab) {
+        console.error('Nenhuma aba ativa encontrada');
+        setError('Nenhuma aba ativa encontrada');
+        return;
+      }
+      
+      // Atualiza a aba ativa apenas se for diferente
+      setActiveTab(prevTab => prevTab?.id === tab.id ? prevTab : tab);
+      
+      // Tenta carregar do cache primeiro (apenas se não for uma atualização forçada)
+      if (!forceUpdate) {
+        const cachedContainers = await loadFromCache(tab.id);
+        if (cachedContainers && Object.keys(cachedContainers).length > 0) {
+          console.log('[getContainers] Usando containers do cache');
+          setContainers(cachedContainers);
+          setLoading(false);
+          
+          // Se já temos dados do cache, não precisamos buscar do background
+          // a menos que seja uma atualização forçada
+          if (!forceUpdate) {
+            return;
+          }
+        }
+      }
+      
+      // Busca do background (atualização em tempo real)
+      console.log('[getContainers] Buscando dados do background...');
+      const response = await Promise.race([
+        chrome.runtime.sendMessage({ 
+          action: 'getContainers',
+          tabId: tab.id 
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout ao buscar containers')), 2000)
+        )
+      ]);
+
+      console.log('[getContainers] Resposta do background recebida');
+      
+      if (response?.containers) {
+        console.log('[getContainers] Atualizando containers com dados do background');
+        
+        // Atualiza o estado apenas se os dados forem diferentes
+        setContainers(prevContainers => {
+          const hasChanges = JSON.stringify(prevContainers) !== JSON.stringify(response.containers);
+          if (hasChanges) {
+            return response.containers;
+          }
+          return prevContainers;
+        });
+        
+        if (response.pageLoadTiming) {
+          setPageLoadTime(prev => prev === response.pageLoadTiming ? prev : response.pageLoadTiming);
+        }
+        
+        // Atualiza o cache
+        await saveToCache(tab.id, response.containers);
+      }
+    } catch (err) {
+      console.error('[getContainers] Erro ao buscar containers:', err);
+      if (Object.keys(containers).length === 0) {
+        setError('Não foi possível carregar os dados. Tente recarregar a página.');
+      }
+    } finally {
+      setIsFetching(false);
+      setLoading(false);
+    }
+  }, [isFetching, loadFromCache, saveToCache, containers]);
+
+  // Efeito para configurar listeners e buscar containers iniciais
+  useEffect(() => {
+    console.log('[useEffect] Configurando listeners...');
+    let isMounted = true;
+    
     // Função para processar mensagens recebidas
     const messageListener = (message, sender, sendResponse) => {
-      console.log('Mensagem recebida no sidepanel:', message);
+      if (!isMounted || message.target !== 'sidepanel') {
+        return;
+      }
+      
+      console.log('[messageListener] Mensagem recebida:', message.action);
       
       if (message.action === 'updateContainers' && message.containers) {
-        console.log('Atualizando containers com mensagem:', message);
-        setContainers(prevContainers => ({
-          ...prevContainers,
-          ...message.containers
-        }));
+        console.log('[messageListener] Atualizando containers');
+        
+        // Atualiza o estado apenas se os dados forem diferentes
+        setContainers(prevContainers => {
+          const hasChanges = JSON.stringify(prevContainers) !== JSON.stringify(message.containers);
+          if (hasChanges) {
+            return message.containers;
+          }
+          return prevContainers;
+        });
         
         if (message.pageLoadTiming) {
-          setPageLoadTime(message.pageLoadTiming);
+          setPageLoadTime(prev => prev === message.pageLoadTiming ? prev : message.pageLoadTiming);
+        }
+        
+        // Atualiza o cache
+        if (activeTab?.id) {
+          saveToCache(activeTab.id, message.containers).catch(console.error);
         }
       }
       
-      // Responde ao background que a mensagem foi recebida
       if (sendResponse) {
         sendResponse({ success: true });
       }
       
-      // Retorna true para manter a conexão aberta para resposta assíncrona
       return true;
     };
 
-    // Configura o listener de mensagens antes de qualquer coisa
+    // Configura o listener de mensagens
     chrome.runtime.onMessage.addListener(messageListener);
     
-    // Adiciona um pequeno atraso antes da primeira busca para garantir que tudo esteja pronto
+    // Busca inicial após um pequeno atraso
     const timer = setTimeout(() => {
-      // Busca os containers iniciais
-      getContainers();
+      if (isMounted) {
+        console.log('[useEffect] Iniciando busca inicial...');
+        getContainers().catch(console.error);
+      }
     }, 100);
-
-    // Limpa o listener quando o componente for desmontado
-    return () => {
-      clearTimeout(timer);
-      chrome.runtime.onMessage.removeListener(messageListener);
-    };
-  }, []);
-  
-  // Efeito para monitorar mudanças na aba ativa
-  useEffect(() => {
+    
+    // Função para lidar com mudanças de visibilidade
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        // Quando o sidepanel se torna visível, tenta atualizar os containers
-        chrome.tabs.query({ active: true, currentWindow: true })
-          .then(tabs => {
-            if (tabs[0]?.id) {
-              chrome.runtime.sendMessage({ 
-                action: 'getContainers',
-                tabId: tabs[0].id 
-              });
-            }
-          });
+      if (isMounted && document.visibilityState === 'visible' && activeTab?.id && !isFetching) {
+        console.log('[handleVisibilityChange] Painel visível, verificando atualizações...');
+        getContainers(activeTab.id, true).catch(console.error);
       }
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Limpa os listeners quando o componente for desmontado
     return () => {
+      isMounted = false;
+      clearTimeout(timer);
+      chrome.runtime.onMessage.removeListener(messageListener);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [activeTab, isFetching, getContainers, saveToCache]);
 
   // Função auxiliar para obter informações da tag
   const getTagInfo = (tagId) => {

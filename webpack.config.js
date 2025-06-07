@@ -66,10 +66,6 @@ module.exports = {
           to: path.resolve("dist"),
         },
         {
-          from: path.resolve("src/popup/App.js"),
-          to: path.resolve("dist/popup"),
-        },
-        {
           from: path.resolve("src/static/icon-16x16.png"),
           to: path.resolve("dist"),
         },

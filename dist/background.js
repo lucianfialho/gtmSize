@@ -15,6 +15,44 @@ var __webpack_exports__ = {};
   const lastUrlByTab = {};
   let activeTabId = null;
 
+  // Função para salvar containers no cache
+  async function saveContainersToCache(tabId, containers) {
+    if (!tabId || !containers) return;
+    try {
+      const cacheKey = `containers_${tabId}`;
+      await chrome.storage.local.set({
+        [cacheKey]: {
+          containers,
+          timestamp: Date.now(),
+          url: lastUrlByTab[tabId] || ''
+        }
+      });
+      console.log(`[GTM Size] Containers salvos no cache para a tab ${tabId}`);
+    } catch (error) {
+      console.error('[GTM Size] Erro ao salvar containers no cache:', error);
+    }
+  }
+
+  // Função para carregar containers do cache
+  async function loadContainersFromCache(tabId) {
+    if (!tabId) return null;
+    try {
+      const cacheKey = `containers_${tabId}`;
+      const result = await chrome.storage.local.get(cacheKey);
+      const cachedData = result[cacheKey];
+
+      // Verifica se o cache é válido (menos de 5 minutos)
+      if (cachedData && Date.now() - cachedData.timestamp < 5 * 60 * 1000) {
+        console.log(`[GTM Size] Containers carregados do cache para a tab ${tabId}`);
+        return cachedData.containers;
+      }
+      return null;
+    } catch (error) {
+      console.error('[GTM Size] Erro ao carregar containers do cache:', error);
+      return null;
+    }
+  }
+
   // Função para verificar se uma URL é um proxy GTM
   function isGtmProxy(url) {
     if (!url || typeof url !== 'string') return false;
@@ -266,63 +304,95 @@ var __webpack_exports__ = {};
   }
 
   // Envia os containers da aba especificada para o sidepanel
-  function sendContainersToSidePanel(tabId) {
-    if (!tabId) {
-      console.log('[GTM Size] ID da tab inválido, ignorando envio para o sidepanel');
-      return;
-    }
-    console.log(`[GTM Size] Enviando containers para o sidepanel, tabId: ${tabId}`);
-    const containers = containersByTab[tabId] || {};
-
-    // Verifica se há containers para enviar
-    if (Object.keys(containers).length === 0) {
-      console.log('[GTM Size] Nenhum container para enviar');
-      return;
-    }
-    console.log(`[GTM Size] Containers a serem enviados:`, {
-      tabId,
-      containerCount: Object.keys(containers).length,
-      containers
-    });
-
-    // Envia uma mensagem para o sidepanel
-    sendToSidepanel({
-      action: 'updateContainers',
-      tabId,
-      containers,
-      activeTabId: tabId
-    }).then(() => {
-      console.log(`[GTM Size] Mensagem enviada com sucesso para o sidepanel`);
-    }).catch(error => {
-      // Ignora erros comuns quando o sidepanel não está aberto
-      if (error === 'Sidepanel não está aberto' || error.message?.includes('Could not establish connection') || error.message?.includes('Receiving end does not exist')) {
-        console.log('[GTM Size] Sidepanel não está aberto, ignorando erro');
+  async function sendContainersToSidePanel(tabId) {
+    console.log(`[GTM Size] Enviando containers para o sidepanel da tab ${tabId}`);
+    try {
+      if (!tabId) {
+        console.error('[GTM Size] ID da tab não fornecido');
         return;
       }
-      console.error('[GTM Size] Erro ao enviar mensagem para o sidepanel:', error);
-    });
+
+      // Se não houver containers para esta aba, tenta obter do cache
+      if (!containersByTab[tabId] || Object.keys(containersByTab[tabId]).length === 0) {
+        console.log(`[GTM Size] Nenhum container encontrado na memória para a tab ${tabId}, verificando cache...`);
+        const cachedContainers = await loadContainersFromCache(tabId);
+        if (cachedContainers) {
+          console.log(`[GTM Size] Usando containers do cache para a tab ${tabId}`);
+          containersByTab[tabId] = cachedContainers;
+        } else {
+          console.log(`[GTM Size] Nenhum cache encontrado para a tab ${tabId}`);
+        }
+      }
+      const containers = containersByTab[tabId] || {};
+      const pageLoadTime = await getPageLoadTime(tabId);
+      console.log(`[GTM Size] Enviando ${Object.keys(containers).length} containers para o sidepanel`);
+
+      // Envia os containers para o sidepanel
+      await sendToSidepanel({
+        action: 'updateContainers',
+        containers,
+        pageLoadTiming: pageLoadTime,
+        timestamp: Date.now(),
+        tabId: tabId,
+        fromCache: !(containersByTab[tabId] && Object.keys(containersByTab[tabId]).length > 0)
+      });
+
+      // Atualiza o cache
+      if (Object.keys(containers).length > 0) {
+        await saveContainersToCache(tabId, containers);
+      }
+    } catch (error) {
+      console.error('[GTM Size] Erro ao enviar containers para o sidepanel:', error);
+    }
   }
   async function sendToSidepanel(message) {
-    // Se não tiver tabId na mensagem, tenta usar a aba ativa
+    let attempt = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
+    const maxAttempts = 3;
+    const retryDelay = 500;
     const targetTabId = message.tabId || activeTabId;
     if (targetTabId === null || targetTabId === undefined) {
       console.log('[GTM Size] Nenhuma aba válida para enviar mensagem para o sidepanel');
-      return Promise.reject('Nenhuma aba válida');
+      return Promise.resolve();
     }
-    console.log(`[GTM Size] Enviando mensagem para o sidepanel, tabId: ${targetTabId}`, message.action);
+
+    // Se não for uma mensagem de atualização de containers, ignora silenciosamente
+    if (message.action !== 'updateContainers' && message.action !== 'getContainers') {
+      return Promise.resolve();
+    }
+    console.log(`[GTM Size] [Tentativa ${attempt}/${maxAttempts}] Enviando mensagem para o sidepanel, tabId: ${targetTabId}`, message.action);
     try {
+      // Verifica se o sidepanel está aberto antes de tentar enviar a mensagem
+      const isSidePanelOpen = await chrome.sidePanel.getOptions({
+        tabId: targetTabId
+      }).then(options => options.enabled).catch(() => false);
+      if (!isSidePanelOpen) {
+        console.log('[GTM Size] Sidepanel não está aberto, ignorando mensagem');
+        return Promise.resolve();
+      }
+
       // Envia a mensagem para a aba específica onde o sidepanel está aberto
       const response = await chrome.tabs.sendMessage(targetTabId, message);
       console.log(`[GTM Size] Resposta do sidepanel para ${message.action}:`, response);
       return response;
     } catch (error) {
-      // Se falhar, verifica se é um erro de conexão (sidepanel fechado)
-      if (error.message.includes('Could not establish connection') || error.message.includes('Receiving end does not exist') || error.message.includes('Could not connect to port')) {
-        console.log('[GTM Size] Sidepanel não está aberto ou não está escutando');
-        return Promise.reject('Sidepanel não está aberto');
+      // Ignora erros específicos de conexão
+      const isConnectionError = error.message.includes('Could not establish connection') || error.message.includes('Receiving end does not exist') || error.message.includes('Could not connect to port');
+      if (isConnectionError) {
+        // Se for a última tentativa, apenas loga e resolve sem erro
+        if (attempt >= maxAttempts) {
+          console.log(`[GTM Size] Sidepanel não respondeu após ${maxAttempts} tentativas`);
+          return Promise.resolve();
+        }
+
+        // Se ainda houver tentativas, tenta novamente
+        console.log(`[GTM Size] Tentativa ${attempt} falhou, tentando novamente em ${retryDelay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return sendToSidepanel(message, attempt + 1);
       }
+
+      // Para outros erros, apenas loga e resolve sem erro
       console.error('[GTM Size] Erro ao enviar mensagem para o sidepanel:', error);
-      return Promise.reject(error);
+      return Promise.resolve();
     }
   }
   function getPageLoadTime(tabId) {
