@@ -1,51 +1,73 @@
-const CopyPlugin = require("copy-webpack-plugin");
-const path = require("path");
-const HtmlPlugin = require("html-webpack-plugin");
-const tailwindcss = require("tailwindcss");
-const autoprefixer = require("autoprefixer");
+const path = require('path');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const CopyPlugin = require('copy-webpack-plugin');
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 
 module.exports = {
   mode: "development",
   devtool: "cheap-module-source-map",
   entry: {
-    popup: path.resolve("./src/popup/popup.js"),
+    sidepanel: "./src/sidepanel.js",
+    background: "./src/background.js"
+  },
+  output: {
+    filename: '[name].js',
+    path: path.resolve(__dirname, 'dist'),
+    publicPath: '',
+    assetModuleFilename: 'assets/[name][ext]',
   },
   module: {
     rules: [
       {
-        test: /\.m?js$/,
-        exclude: /(node_modules|bower_components)/,
+        test: /\.(js|jsx)$/,
+        exclude: /node_modules/,
         use: {
-          loader: "babel-loader",
+          loader: 'babel-loader',
           options: {
-            presets: ["@babel/preset-env", "@babel/preset-react"],
-          },
-        },
+            presets: ['@babel/preset-env', '@babel/preset-react']
+          }
+        }
       },
       {
-        use: [
-          "style-loader",
-          "css-loader",
-          {
-            loader: "postcss-loader",
-            options: {
-              postcssOptions: {
-                ident: "postcss",
-                plugins: [tailwindcss, autoprefixer],
-              },
-            },
-          },
-        ],
         test: /\.css$/i,
+        use: [
+          MiniCssExtractPlugin.loader,
+          'css-loader',
+          'postcss-loader',
+        ],
+      },
+      {
+        test: /\.(png|svg|jpg|jpeg|gif)$/i,
+        type: 'asset/resource',
+        generator: {
+          filename: 'assets/images/[name][ext]',
+        },
       },
     ],
   },
   plugins: [
+    new CleanWebpackPlugin(),
+    new MiniCssExtractPlugin({
+      filename: '[name].css',
+    }),
+    new HtmlWebpackPlugin({
+      template: "./src/sidepanel.html",
+      filename: "sidepanel.html",
+      chunks: ["sidepanel"],
+      inject: 'body',
+      scriptLoading: 'module',
+      minify: false
+    }),
     new CopyPlugin({
       patterns: [
         {
           from: path.resolve("src/manifest.json"),
           to: path.resolve("dist"),
+        },
+        {
+          from: path.resolve("src/popup/App.js"),
+          to: path.resolve("dist/popup"),
         },
         {
           from: path.resolve("src/static/icon-16x16.png"),
@@ -71,25 +93,31 @@ module.exports = {
           from: path.resolve("src/performance.js"),
           to: path.resolve("dist"),
         },
+        {
+          from: path.resolve("src/content.js"),
+          to: path.resolve("dist"),
+        },
+        {
+          from: path.resolve("src/sidepanel.css"),
+          to: path.resolve("dist"),
+          noErrorOnMissing: true,
+        },
+        {
+          from: path.resolve("src/assets"),
+          to: path.resolve("dist/assets"),
+          noErrorOnMissing: true,
+        },
       ],
-    }),
-    new HtmlPlugin({
-      title: "Gtm size",
-      filename: "popup.html",
-      chunks: ["popup"],
-      templateContent: `
-                <html>
-                    <body>
-                        <div id='root'></div>
-                    </body>
-                </html>
-            `,
     }),
   ],
   resolve: {
-    extensions: [".js"],
+    extensions: ['.js', '.jsx', '.json'],
+    alias: {
+      'react': path.resolve('./node_modules/react'),
+      'react-dom': path.resolve('./node_modules/react-dom')
+    }
   },
-  output: {
-    filename: "[name].js",
-  },
+  optimization: {
+    minimize: false
+  }
 };

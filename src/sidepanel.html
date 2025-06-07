@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GTM Size Panel</title>
+  <link href="sidepanel.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --text: #1f2937;
+      --text-secondary: #6b7280;
+      --bg: #ffffff;
+      --bg-secondary: #f3f4f6;
+      --border: #e5e7eb;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --primary: #6366f1;
+        --primary-hover: #818cf8;
+        --text: #f9fafb;
+        --text-secondary: #9ca3af;
+        --bg: #111827;
+        --bg-secondary: #1f2937;
+        --border: #374151;
+      }
+    }
+    
+    body {
+      width: 400px;
+      height: 100%;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+    
+    #root {
+      width: 100%;
+      height: 100%;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* Estilos para o modo dark/light */
+    .dark {
+      --primary: #6366f1;
+      --primary-hover: #818cf8;
+      --text: #f9fafb;
+      --text-secondary: #9ca3af;
+      --bg: #111827;
+      --bg-secondary: #1f2937;
+      --border: #374151;
+    }
+    
+    /* Dark mode colors */
+    .dark {
+      --background: #1f2937;
+      --foreground: #f3f4f6;
+      --card-bg: #111827;
+      --card-fg: #f3f4f6;
+      --border: #374151;
+    }
+    
+    /* Light mode colors */
+    :not(.dark) {
+      --background: #f3f4f6;
+      --foreground: #1f2937;
+      --card-bg: #ffffff;
+      --card-fg: #1f2937;
+      --border: #e5e7eb;
+    }
+    
+    /* Apply colors */
+    body {
+      background-color: var(--background);
+      color: var(--foreground);
+    }
+    
+    .border {
+      border-color: var(--border);
+    }
+    
+    .bg-card {
+      background-color: var(--card-bg);
+      color: var(--card-fg);
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+  <div id="root"></div>
+</body>
+</html>

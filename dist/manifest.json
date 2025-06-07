@@ -1,30 +1,38 @@
 {
     "name": "Get Google Tag Manager Size",
-    "version": "2.1.3",
+    "version": "2.2.0",
     "manifest_version": 3,
     "permissions": [
-        "webRequest"
+        "webRequest",
+        "webNavigation",
+        "sidePanel",
+        "activeTab",
+        "scripting"
     ],
     "host_permissions": [ "*://*/*" ],
     "background": {
         "service_worker": "background.js"
     },
-    "content_scripts": [
-        {
-            "matches": ["*://*/*"],
-            "js": ["performance.js"]
-        }
-
-    ],
     "action": {
-        "default_title": "Get Google Tag Manager Size",
+        "default_title": "Open GTM Size Panel",
         "default_icon": {
             "16": "icon-16x16.png",
             "38": "icon-38x38.png",
             "48": "icon-48x48.png",
             "128": "icon-128x128.png"
-        },
-        "default_popup": "popup.html"
+        }
+    },
+    "side_panel": {
+        "default_path": "sidepanel.html"
+    },
+    "commands": {
+        "_execute_side_panel": {
+            "description": "Open GTM Size Side Panel",
+            "suggested_key": {
+                "default": "Ctrl+Shift+Y",
+                "mac": "Command+Shift+Y"
+            }
+        }
     },
     "icons": {
         "16": "icon-16x16.png",
