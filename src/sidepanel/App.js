@@ -157,17 +157,32 @@ function SidepanelApp() {
   }, []);
 
   useEffect(() => {
-    const getContainers = async () => {
+    // Função para buscar os containers do background
+    const getContainers = async (tabId) => {
       try {
         setLoading(true);
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const tab = tabId ? { id: tabId } : await chrome.tabs.query({ active: true, currentWindow: true }).then(tabs => tabs[0]);
+        
+        if (!tab) {
+          console.error('Nenhuma aba ativa encontrada');
+          setError('Nenhuma aba ativa encontrada');
+          return;
+        }
+        
         setActiveTab(tab);
 
-        // Solicita os containers para o background
-        const response = await chrome.runtime.sendMessage({ 
-          action: 'getContainers',
-          tabId: tab.id 
-        });
+        console.log('Solicitando containers para a tab:', tab.id);
+        
+        // Tenta enviar a mensagem com timeout
+        const response = await Promise.race([
+          chrome.runtime.sendMessage({ 
+            action: 'getContainers',
+            tabId: tab.id 
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout ao buscar containers')), 2000)
+          )
+        ]);
 
         console.log('Resposta do background:', response);
         
@@ -177,10 +192,11 @@ function SidepanelApp() {
           setPageLoadTime(response.pageLoadTiming || 'N/A');
         } else {
           console.log('Nenhum container recebido do background');
+          setContainers({}); // Limpa containers antigos
         }
       } catch (err) {
         console.error('Error getting containers:', err);
-        setError('Failed to load GTM containers');
+        // Não define erro para não sobrepor a UI com mensagens de erro temporárias
       } finally {
         setLoading(false);
       }
@@ -192,38 +208,61 @@ function SidepanelApp() {
       
       if (message.action === 'updateContainers' && message.containers) {
         console.log('Atualizando containers com mensagem:', message);
-        setContainers(prevContainers => {
-          const updatedContainers = {
-            ...prevContainers,
-            ...message.containers
-          };
-          console.log('Containers atualizados:', updatedContainers);
-          return updatedContainers;
-        });
+        setContainers(prevContainers => ({
+          ...prevContainers,
+          ...message.containers
+        }));
         
-        // Confirma o recebimento da mensagem
-        if (sendResponse) {
-          sendResponse({ status: 'success' });
+        if (message.pageLoadTiming) {
+          setPageLoadTime(message.pageLoadTiming);
         }
-        return true; // Indica que a resposta será assíncrona
       }
       
-      // Para outras mensagens, não faz nada mas retorna true para manter o canal aberto
+      // Responde ao background que a mensagem foi recebida
       if (sendResponse) {
-        sendResponse({ status: 'ignored' });
+        sendResponse({ success: true });
       }
+      
+      // Retorna true para manter a conexão aberta para resposta assíncrona
       return true;
     };
 
-    // Adiciona o listener para mensagens
+    // Configura o listener de mensagens antes de qualquer coisa
     chrome.runtime.onMessage.addListener(messageListener);
     
-    // Carrega os containers iniciais
-    getContainers();
+    // Adiciona um pequeno atraso antes da primeira busca para garantir que tudo esteja pronto
+    const timer = setTimeout(() => {
+      // Busca os containers iniciais
+      getContainers();
+    }, 100);
 
     // Limpa o listener quando o componente for desmontado
     return () => {
+      clearTimeout(timer);
       chrome.runtime.onMessage.removeListener(messageListener);
+    };
+  }, []);
+  
+  // Efeito para monitorar mudanças na aba ativa
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Quando o sidepanel se torna visível, tenta atualizar os containers
+        chrome.tabs.query({ active: true, currentWindow: true })
+          .then(tabs => {
+            if (tabs[0]?.id) {
+              chrome.runtime.sendMessage({ 
+                action: 'getContainers',
+                tabId: tabs[0].id 
+              });
+            }
+          });
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
@@ -318,26 +357,54 @@ function SidepanelApp() {
     id: containerId
   }));
 
+  // Se estiver carregando, mostra apenas o loading
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+      <div className="min-h-full" style={{ maxWidth: '400px', width: '360px' }}>
+        <header className="bg-card border-b" style={{ maxWidth: '400px', width: '360px', minHeight: '200px' }}>
+          <div className="p-6 flex flex-col items-center justify-center h-full space-y-8">
+            <h1 className="text-2xl font-light text-center leading-tight">
+              Welcome to Get<br />Google Tag Manager Size
+            </h1>
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        </header>
       </div>
     );
   }
 
+  // Se houver erro, mostra o header e a mensagem de erro
   if (error) {
     return (
-      <div className="p-4 text-center text-red-500">
-        <p>Error: {error}</p>
+      <div className="min-h-full" style={{ maxWidth: '400px', width: '360px' }}>
+        <header className="bg-card border-b" style={{ maxWidth: '400px', width: '360px', minHeight: '200px' }}>
+          <div className="p-6 flex flex-col items-center justify-center h-full space-y-8">
+            <h1 className="text-2xl font-light text-center leading-tight">
+              Welcome to Get<br />Google Tag Manager Size
+            </h1>
+            <div className="text-red-500 text-center">
+              <p>Error: {error}</p>
+            </div>
+          </div>
+        </header>
       </div>
     );
   }
 
+  // Se não houver containers, mostra o header e a mensagem
   if (containerList.length === 0) {
     return (
-      <div className="p-4 text-center text-gray-600">
-        <p>No GTM containers found on this page</p>
+      <div className="min-h-full" style={{ maxWidth: '400px', width: '360px' }}>
+        <header className="bg-card border-b" style={{ maxWidth: '400px', width: '360px', minHeight: '200px' }}>
+          <div className="p-6 flex flex-col items-center justify-center h-full space-y-8">
+            <h1 className="text-2xl font-light text-center leading-tight">
+              Welcome to Get<br />Google Tag Manager Size
+            </h1>
+            <div className="text-center">
+              <p className="text-gray-600">No GTM containers found on this page</p>
+            </div>
+          </div>
+        </header>
       </div>
     );
   }

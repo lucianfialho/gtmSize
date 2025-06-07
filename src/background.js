@@ -328,33 +328,61 @@
     });
   }
 
-  async function sendToSidepanel(message) {
+  async function sendToSidepanel(message, attempt = 1) {
     // Se não tiver tabId na mensagem, tenta usar a aba ativa
     const targetTabId = message.tabId || activeTabId;
+    const maxAttempts = 3; // Reduzido para 3 tentativas
+    const retryDelay = 500; // Aumentado para 500ms entre tentativas
     
     if (targetTabId === null || targetTabId === undefined) {
       console.log('[GTM Size] Nenhuma aba válida para enviar mensagem para o sidepanel');
-      return Promise.reject('Nenhuma aba válida');
+      return Promise.resolve(); // Resolve em vez de rejeitar
     }
 
-    console.log(`[GTM Size] Enviando mensagem para o sidepanel, tabId: ${targetTabId}`, message.action);
+    // Se não for uma mensagem de atualização de containers, ignora silenciosamente
+    if (message.action !== 'updateContainers' && message.action !== 'getContainers') {
+      return Promise.resolve();
+    }
+
+    console.log(`[GTM Size] [Tentativa ${attempt}/${maxAttempts}] Enviando mensagem para o sidepanel, tabId: ${targetTabId}`, message.action);
     
     try {
+      // Verifica se o sidepanel está aberto antes de tentar enviar a mensagem
+      const isSidePanelOpen = await chrome.sidePanel.getOptions({ tabId: targetTabId })
+        .then(options => options.enabled)
+        .catch(() => false);
+      
+      if (!isSidePanelOpen) {
+        console.log('[GTM Size] Sidepanel não está aberto, ignorando mensagem');
+        return Promise.resolve();
+      }
+      
       // Envia a mensagem para a aba específica onde o sidepanel está aberto
       const response = await chrome.tabs.sendMessage(targetTabId, message);
       console.log(`[GTM Size] Resposta do sidepanel para ${message.action}:`, response);
       return response;
     } catch (error) {
-      // Se falhar, verifica se é um erro de conexão (sidepanel fechado)
-      if (error.message.includes('Could not establish connection') || 
-          error.message.includes('Receiving end does not exist') ||
-          error.message.includes('Could not connect to port')) {
-        console.log('[GTM Size] Sidepanel não está aberto ou não está escutando');
-        return Promise.reject('Sidepanel não está aberto');
+      // Ignora erros específicos de conexão
+      const isConnectionError = error.message.includes('Could not establish connection') || 
+                               error.message.includes('Receiving end does not exist') ||
+                               error.message.includes('Could not connect to port');
+      
+      if (isConnectionError) {
+        // Se for a última tentativa, apenas loga e resolve sem erro
+        if (attempt >= maxAttempts) {
+          console.log(`[GTM Size] Sidepanel não respondeu após ${maxAttempts} tentativas`);
+          return Promise.resolve();
+        }
+        
+        // Se ainda houver tentativas, tenta novamente
+        console.log(`[GTM Size] Tentativa ${attempt} falhou, tentando novamente em ${retryDelay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return sendToSidepanel(message, attempt + 1);
       }
       
+      // Para outros erros, apenas loga e resolve sem erro
       console.error('[GTM Size] Erro ao enviar mensagem para o sidepanel:', error);
-      return Promise.reject(error);
+      return Promise.resolve();
     }
   }
 
