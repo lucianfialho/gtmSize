@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { KNOWN_TAGS, CATEGORY_NAMES } from '../constants.js';
+import { KNOWN_TAGS, CATEGORY_NAMES } from '../background/constants.js';
 
 function SidepanelApp() {
   const [loading, setLoading] = useState(true);
