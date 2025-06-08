@@ -4,12 +4,11 @@ import {
   CATEGORY_NAMES,
   MACRO_TYPES,
   TRIGGER_TYPES,
-  GTM_PATTERNS,
-  GTM_PROXY_INDICATORS,
   CACHE_KEYS,
   ERROR_MESSAGES
 } from './background/constants.js';
 import { CacheManager } from './background/cache-manager.js';
+import { GTMDetector } from './background/gtm-detector.js';
 
 (function() {
   'use strict';
@@ -18,42 +17,44 @@ import { CacheManager } from './background/cache-manager.js';
   
   // Variáveis de estado
   const cacheManager = new CacheManager();
-  const requestTiming = {};
   let pageLoadTiming = null;
   let activeTabId = null;
 
-  // Função para verificar se uma URL é um proxy GTM
-  function isGtmProxy(url) {
-    if (!url || typeof url !== 'string') return false;
+  // Create GTM detector with callback for container detection
+  const gtmDetector = new GTMDetector(cacheManager, async (tabId, containerId, containerData) => {
+    // This callback runs when a GTM container is detected
+    console.log(`[GTM Size] Container detected: ${containerId} on tab ${tabId}`);
+    
+    // Add container analysis (this will be moved to ContainerAnalyzer in Step 4)
     try {
-      const urlObj = new URL(url);
-      return (
-        urlObj.hostname.includes('googletagmanager.com') &&
-        GTM_PROXY_INDICATORS.some(indicator => url.includes(indicator))
-      );
-    } catch (e) {
-      console.error('[GTM Size] URL inválida ao verificar proxy:', url, e);
-      return false;
+      const analyse = await fetchGTMData(containerData.url);
+      containerData.analyse = analyse;
+    } catch (error) {
+      console.error('[GTM Size] Error analyzing container:', error);
+      containerData.analyse = null;
     }
-  }
+    
+    // Update the UI
+    updateBadgeAndPopup(tabId, containerId, containerData);
+    
+    // Notify the sidepanel about the update
+    chrome.runtime.sendMessage({
+      action: 'updateContainers',
+      tabId: tabId,
+      containerId: containerId,
+      containerData: containerData
+    });
 
-  // Função para verificar se uma URL é uma requisição do GTM
-  function isGTMRequest(url) {
-    if (!url || typeof url !== 'string') return false;
-    return Object.values(GTM_PATTERNS).some(pattern => pattern.test(url));
-  }
-
-  // Função para extrair o ID do container de uma URL do GTM
-  function extractContainerId(url) {
-    if (!url || typeof url !== 'string') return null;
-    try {
-      const urlObj = new URL(url);
-      return urlObj.searchParams.get('id');
-    } catch (e) {
-      console.error('[GTM Size] Erro ao extrair ID do container:', url, e);
-      return null;
-    }
-  }
+    // Update badge with container count
+    const tabContainers = cacheManager.getTabContainers(tabId);
+    const numberOfContainers = Object.keys(tabContainers).length;
+    setBadgeInfo(
+      containerData.sizeInKb,
+      containerData.percent,
+      tabId,
+      numberOfContainers
+    );
+  });
 
   function updateBadgeAndPopup(tabId, containerId, containerData) {
     console.log(`[GTM Size] Atualizando badge e popup para tab ${tabId}, container ${containerId}`, containerData);
@@ -217,10 +218,6 @@ import { CacheManager } from './background/cache-manager.js';
     });
   }
 
-  function sizeByGoogleTagManagerLimit(sizeOfContainer = 0) {
-    return Math.round((sizeOfContainer / CONFIG.MAX_GTM_SIZE) * 100);
-  }
-
   // Função para obter o nome amigável de uma tag
   function getFriendlyTagName(tagId) {
     // Verifica se é um template customizado
@@ -364,7 +361,7 @@ import { CacheManager } from './background/cache-manager.js';
     }
 
     // Valida se a URL parece ser um script GTM
-    if (!isGTMRequest(url) && !isGtmProxy(url)) {
+    if (!gtmDetector.isGTMRequest(url) && !gtmDetector.isGtmProxy(url)) {
       console.error(ERROR_MESSAGES.INVALID_GTM_URL, url);
       return { version: null, macros: null, predicates: null, tags: null, rules: null };
     }
@@ -504,186 +501,6 @@ import { CacheManager } from './background/cache-manager.js';
       console.error('Error setting up side panel:', error);
     }
   }
-
-  // Listener para requisições de script GTM
-  chrome.webRequest.onBeforeRequest.addListener(
-    (details) => {
-      console.log(`[GTM Size] Nova requisição detectada: ${details.url}`, {
-        type: details.type,
-        tabId: details.tabId,
-        frameId: details.frameId,
-        requestId: details.requestId
-      });
-      
-      if (details.type === "script" && isGTMRequest(details.url)) {
-        console.log("[GTM Size] GTM detectado:", details.url, "na aba", details.tabId);
-        requestTiming[details.requestId] = {
-          startTime: performance.now(),
-          url: details.url,
-          tabId: details.tabId
-        };
-        console.log(`[GTM Size] Tempo inicial registrado para request ${details.requestId}`);
-      }
-    },
-    { urls: ["<all_urls>"] }
-  );
-
-  // Listener para requisições de script GTM concluídas
-  chrome.webRequest.onCompleted.addListener(
-    async (details) => {
-      console.log(`[GTM Size] Requisição concluída: ${details.url}`, {
-        type: details.type,
-        tabId: details.tabId,
-        requestId: details.requestId,
-        statusCode: details.statusCode
-      });
-      
-      if (details.type !== "script" || !isGTMRequest(details.url)) {
-        console.log('[GTM Size] Ignorando requisição - não é um script GTM');
-        return;
-      }
-
-      console.log('[GTM Size] GTM script detected:', details.url);
-      
-      try {
-        // Obter o tempo de carregamento
-        const timing = requestTiming[details.requestId];
-        if (timing) {
-          timing.endTime = performance.now();
-          timing.loadTime = Math.round(timing.endTime - timing.startTime) / 1000; //in seconds
-        }
-        
-        // Inicializar variáveis de tamanho
-        let contentLengthInKb = 0;
-        let uncompressedSizeKb = 0;
-        let sizeEstimate = false;
-        
-        try {
-          console.log('[GTM Size] Processing GTM container...');
-          
-          // 1. Obter o content-length do header da resposta
-          const contentLengthHeader = details.responseHeaders?.find(
-            (header) => header.name.toLowerCase() === "content-length"
-          );
-          
-          if (contentLengthHeader?.value) {
-            contentLengthInKb = Math.round(parseInt(contentLengthHeader.value) / 1024);
-            console.log(`[GTM Size] Content-Length from response headers: ${contentLengthInKb}KB`);
-            
-            // Buscar o conteúdo para obter o tamanho descomprimido
-            const response = await fetch(details.url, {
-              cache: 'no-store',
-              credentials: 'same-origin'
-            });
-            
-            const text = await response.text();
-            uncompressedSizeKb = Math.round(new TextEncoder().encode(text).length / 1024);
-            
-            // Verificar se há compressão
-            const contentEncoding = response.headers.get('content-encoding');
-            const isCompressed = !!contentEncoding;
-            
-            if (isCompressed) {
-              console.log(`[GTM Size] Compression detected: ${contentEncoding}`);
-              console.log(`[GTM Size] Transferred (compressed): ${contentLengthInKb}KB`);
-              console.log(`[GTM Size] Uncompressed size: ${uncompressedSizeKb}KB`);
-            } else {
-              console.log(`[GTM Size] No compression detected`);
-              console.log(`[GTM Size] Transferred: ${contentLengthInKb}KB`);
-              uncompressedSizeKb = contentLengthInKb;
-            }
-          } else {
-            console.log('[GTM Size] No Content-Length header found, falling back to fetch...');
-            sizeEstimate = true;
-            
-            const response = await fetch(details.url, {
-              cache: 'no-store',
-              credentials: 'same-origin'
-            });
-            
-            const buffer = await response.arrayBuffer();
-            contentLengthInKb = Math.round(buffer.byteLength / 1024);
-            
-            const text = new TextDecoder().decode(buffer);
-            uncompressedSizeKb = Math.round(new TextEncoder().encode(text).length / 1024);
-            
-            const contentEncoding = response.headers.get('content-encoding');
-            const isCompressed = !!contentEncoding;
-            
-            console.log(`[GTM Size] Fetched size: ${contentLengthInKb}KB` + 
-                       (isCompressed ? ` (compressed with ${contentEncoding})` : ''));
-            console.log(`[GTM Size] Uncompressed size: ${uncompressedSizeKb}KB`);
-          }
-        } catch (error) {
-          console.error('[GTM Size] Error measuring container size:', error);
-          if (contentLengthHeader?.value) {
-            contentLengthInKb = Math.round(parseInt(contentLengthHeader.value) / 1024);
-            console.log('[GTM Size] Using content-length as fallback:', contentLengthInKb, 'KB');
-          }
-        }
-
-        const containerId = extractContainerId(details.url);
-        const gtmUrl = details.url;
-
-        try {
-          // Ensure containerId is valid
-          if (!containerId) {
-            console.error('[GTM Size] Invalid container ID extracted from URL:', details.url);
-            return;
-          }
-
-          const analyse = await fetchGTMData(gtmUrl);
-          const containerSize = sizeByGoogleTagManagerLimit(contentLengthInKb * 1024);
-
-          console.log(`[GTM Size] Preparing container data for ${containerId} - sizeEstimate: ${sizeEstimate}`);
-          const containerData = {
-            sizeInKb: contentLengthInKb,
-            percent: containerSize,
-            analyse,
-            timing: timing || null,
-            url: gtmUrl,
-            isProxy: !gtmUrl.includes('googletagmanager.com'),
-            sizeEstimate: sizeEstimate
-          };
-          
-          // Store container using CacheManager
-          cacheManager.setContainer(details.tabId, containerId, containerData);
-          console.log(`[GTM Size] Container ${containerId} data stored for tab ${details.tabId}`);
-          
-          // Update the UI
-          updateBadgeAndPopup(details.tabId, containerId, containerData);
-          
-          // Notify the sidepanel about the update
-          chrome.runtime.sendMessage({
-            action: 'updateContainers',
-            tabId: details.tabId,
-            containerId: containerId,
-            containerData: containerData
-          });
-
-          // Update badge with container count
-          const tabContainers = cacheManager.getTabContainers(details.tabId);
-          const numberOfContainers = Object.keys(tabContainers).length;
-          setBadgeInfo(
-            contentLengthInKb,
-            containerSize,
-            details.tabId,
-            numberOfContainers
-          );
-          
-          // Clean up the timing data
-          delete requestTiming[details.requestId];
-        } catch (error) {
-          console.error('[GTM Size] Error processing container data:', error);
-          return; // Exit if there was an error
-        }
-      } catch (error) {
-        console.error('Error processing GTM script:', error);
-      }
-    },
-    { urls: ["<all_urls>"] },
-    ["responseHeaders"]
-  );
 
   // Listener para navegação concluída
   chrome.webNavigation.onCompleted.addListener((details) => {
@@ -892,4 +709,9 @@ import { CacheManager } from './background/cache-manager.js';
       enabled: true
     }).catch(console.error);
   });
+
+  // Set up GTM detector (this replaces the old webRequest listeners)
+  gtmDetector.setupWebRequestListeners();
+  
+  console.log('[GTM Size] Background script initialized with GTMDetector');
 })();
